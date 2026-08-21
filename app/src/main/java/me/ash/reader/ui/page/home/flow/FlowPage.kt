@@ -57,7 +57,9 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -148,6 +150,9 @@ fun FlowPage(
     val filterUiState = pagerData.filterState
 
     val listState = rememberSaveable(pagerData, saver = LazyListState.Saver) { LazyListState(0, 0) }
+
+    val density = LocalDensity.current
+    var viewportHeightPx by remember { mutableStateOf(0) }
 
     val isTopBarElevated = topBarTonalElevation.value > 0
     val scrolledTopBarContainerColor =
@@ -637,7 +642,12 @@ fun FlowPage(
                             )
                             .also { currentPullToLoadState = it }
 
-                    Box(modifier = Modifier.fillMaxSize()) {
+                    Box(
+                        modifier =
+                            Modifier.fillMaxSize().onSizeChanged {
+                                viewportHeightPx = it.height
+                            }
+                    ) {
                         LazyColumn(
                             modifier =
                                 Modifier.pullToLoad(
@@ -700,6 +710,13 @@ fun FlowPage(
                                         Modifier.windowInsetsBottomHeight(
                                             WindowInsets.navigationBars
                                         )
+                                )
+                                // Ensures the last item can scroll all the way to the top of the
+                                // viewport, so "mark as read on scroll" can reach it like any
+                                // other item.
+                                Spacer(
+                                    modifier =
+                                        Modifier.height(with(density) { viewportHeightPx.toDp() })
                                 )
                             }
                         }
