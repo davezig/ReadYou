@@ -535,7 +535,11 @@ fun FlowPage(
                                         .firstOrNull { it.contentType == CONTENT_TYPE_ARTICLE }
                                         ?.key
                                 val items = mutableListOf<ArticleWithFeed>()
-                                var found = false
+                                // No item with contentType == CONTENT_TYPE_ARTICLE remains
+                                // visible once every article has scrolled past the read line
+                                // (e.g. the trailing spacer is the only thing left on screen),
+                                // so treat that as every remaining article being read.
+                                var found = firstItemKey == null
                                 val itemCount = pagingItems.itemCount
                                 for (index in 0 until itemCount) {
                                     pagingItems.peek(index).let {
