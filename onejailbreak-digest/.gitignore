@@ -1,0 +1,4 @@
+seen_urls.json
+browser-profile/
+.venv/
+__pycache__/
