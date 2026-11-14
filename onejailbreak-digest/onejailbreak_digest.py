@@ -244,20 +244,45 @@ def lead_from_article_page(html: str) -> str:
 # Pipeline
 # --------------------------------------------------------------------------
 
-def discover(fetcher: Fetcher, base: str) -> tuple[list[dict], str]:
+def find_feed_items(fetcher: Fetcher, base: str) -> list[dict]:
     for path in FEED_PATHS:
         url = urljoin(base, path)
         try:
-            text = fetcher.get(url)
-            items = items_from_feed(text)
+            items = items_from_feed(fetcher.get(url))
         except (Blocked, ET.ParseError) as exc:
             log.debug("No usable feed at %s (%s)", url, exc)
             continue
         if items:
-            log.info("Using feed %s (%d items)", url, len(items))
-            return items, "feed"
-    log.info("No feed found; parsing homepage %s", base)
-    return items_from_homepage(fetcher.get(base), base), "homepage"
+            log.info("Found feed %s (%d items)", url, len(items))
+            return items
+    return []
+
+
+def discover(fetcher: Fetcher, base: str) -> tuple[list[dict], str]:
+    # The homepage is the live source of truth: the feed on this site is
+    # out of date, so it is used only for summaries and as a fallback.
+    feed_items = find_feed_items(fetcher, base)
+    feed_by_url = {i["url"]: i for i in feed_items}
+
+    homepage_error: Blocked | None = None
+    try:
+        items = items_from_homepage(fetcher.get(base), base)
+    except Blocked as exc:
+        homepage_error, items = exc, []
+
+    if items:
+        for item in items:
+            feed_match = feed_by_url.get(item["url"])
+            if feed_match and feed_match.get("summary"):
+                item["summary"] = feed_match["summary"]
+        return items, "homepage"
+
+    if feed_items:
+        log.warning("Homepage gave no articles; falling back to the feed, which may be stale")
+        return feed_items, "feed"
+    if homepage_error:
+        raise homepage_error
+    return [], "homepage"
 
 
 def enrich(fetcher: Fetcher, items: list[dict], max_articles: int) -> list[dict]:
